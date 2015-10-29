@@ -1,8 +1,8 @@
-- [ ] Настройка
-  - [ ] CentOS 6
-  - [ ] Emulator
-  - [ ] client + runtime
-  - [ ] wireshark
+- [X] Настройка
+  - [x] Lubuntu x64, ~~CentOS 6~~
+  - [x] Emulator
+  - [x] client + runtime, _графический клиент SM даже получил состояние Optimal у эмулятора
+  - [x] wireshark
 - [ ] Начало
   - [ ] Коннект к серверу
   - [ ] Отправка пакета длины и [q1, q4, time, qpower]
