@@ -4,4 +4,4 @@
 
 ИЛИ
 
-	tcp.port == 2463 && data.len > 0
+	tcp.port == 2463 && data.len > 4
