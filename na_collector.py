@@ -5,6 +5,7 @@ import struct
 import sys
 import time
 import binascii
+import numpy
 
 class SantriClient:
     ''' Santricity client that sends the packets to the server
@@ -20,14 +21,27 @@ class SantriClient:
     def generate_session_signature(self):
         ''' Generates a time signature for the current session '''
         #TODO: написать код для генерирования сигнатуры
-        return b'\55\6c\31\77'
+
+        session_sign = b'\x55\x6c\x31\x77'
+        return binascii.hexlify(session_sign)
 
     def generate_packet(self, packet_code):
         ''' Generates the package on the signature of the session
             and the request code
         '''
+
+        packet_data = bytearray()
         if (packet_code == '040'):
-            packet_data = self.time_sign + b'\00\00\00\00' + b'\00\00\00\02' + b'\53\69\4d\42' + b'\00\00\00\01' + b'\00\00\00\28' + 4*b'\00\00\00\00'
+            packet_data.extend(self.time_sign)
+            packet_data.extend(self.int_to_4hex(0))
+            packet_data.extend(self.int_to_4hex(2))
+            packet_data.extend(binascii.hexlify(b'\x53\x69\x4d\x42'))
+            packet_data.extend(self.int_to_4hex(1))
+            packet_data.extend(self.int_to_4hex(40))
+            packet_data.extend(self.int_to_4hex(0))
+            packet_data.extend(self.int_to_4hex(0))
+            packet_data.extend(self.int_to_4hex(0))
+            packet_data.extend(self.int_to_4hex(0))
         return packet_data
 
     def show(self, command):
@@ -38,25 +52,40 @@ class SantriClient:
 
     def get_data(self, request):
         ''' Returns the data which have been received from the server '''
-        conn = socket.socket()
-        conn.connect( (self.host, self.port) )
+        #conn = socket.socket()
+        #conn.connect( (self.host, self.port) )
 
-        length_packet = self.generate_length_packet(len(request))
-        conn.send(length_packet)
-        print ('Send packet' + binascii.hexlify(length_packet))
-        conn.send(request)
-        data = b""
-        tmp = self.conn.recv(1024)
+        #Делим на 2, так как у нас hex
+        length_packet = self.generate_length_packet(len(request)//2)
+        main_packet = self.generate_packet(request)
+        #conn.send(length_packet)
+        print ('Sending length_packet, main packet length is %i' % (len(request)//2))
+        print (length_packet)
+
+        print ('Sending main package...')
+        print (request)
+
+
+        #conn.send(request)
+
+        data = b''
+        '''tmp = self.conn.recv(1024)
         while tmp:
             data += tmp
-            tmp = conn.recv(1024)
-        print( binascii.hexlify(data) )
-        conn.close()
+            tmp = conn.recv(1024)'''
+
+        #conn.close()
 
     def generate_length_packet(self, length):
+        ''' Generates a packet that indicates the next packet length '''
         length_pack = bytearray(b'\x80\x00\x00')
-        length_pack.extend(b'\28')
-        return length_pack
+        length_pack.append(length)
+        return binascii.hexlify(length_pack)
+
+    def int_to_4hex(self, num):
+        ''' Convert int to 4 byte hex (just like 1 to 00 00 00 01) '''
+        #!!! Здесь нужно сделать reverse для 4 байтов hex и можно начинать отправлять запросы
+        return binascii.hexlify(numpy.int32(num))
 
 class SantriParser:
     ''' Santricity parser of raw data '''
