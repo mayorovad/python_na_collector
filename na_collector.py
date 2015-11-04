@@ -42,7 +42,7 @@ class SantriClient:
             packet_data.extend(self.int_to_4hex(0))
             packet_data.extend(self.int_to_4hex(0))
             packet_data.extend(self.int_to_4hex(0))
-        return binascii.hexlify(packet_data)
+        return packet_data
 
     def show(self, command):
         ''' Returns the response to a main_package in a readable form '''
@@ -52,29 +52,42 @@ class SantriClient:
 
     def get_data(self, main_package):
         ''' Returns the data which have been received from the server '''
-        #conn = socket.socket()
-        #conn.connect( (self.host, self.port) )
+        self.conn = socket.socket()
+        self.conn.connect( (self.host, self.port) )
 
-        #Делим на 2, так как у нас hex
-        length_packet = self.generate_length_packet(len(main_package)//2)
+        #Делим на 2, так как нужна длина в байтах
+        length_packet = self.generate_length_packet(len(main_package))
         main_packet = self.generate_packet(main_package)
-        #conn.send(length_packet)
-        print ('Sending length_packet, main packet length is %i' % (len(main_package)//2))
-        print (binascii.hexlify(length_packet))
 
+        print ('Sending length_packet, main packet length is %i' % (len(main_package)))
+        self.conn.send(length_packet)
         print ('Sending main package...')
-        print (main_package)
+        self.conn.send(main_package)
 
+        print ('Receiving length_packet from server...')
+        length_packet = self.conn.recv(4)
+        need_to_recieve = int(binascii.hexlify(length_packet[-2::]), 16)
+        remaining_bytes = need_to_recieve
+        print(remaining_bytes)
+        print('Receiving bigdata (%i bytes)' % (need_to_recieve))
 
-        #conn.send(main_package)
-
-        data = b''
-        '''tmp = self.conn.recv(1024)
-        while tmp:
-            data += tmp
-            tmp = conn.recv(1024)'''
-
-        #conn.close()
+        bigdata = b''
+        tmp = self.conn.recv(4096)
+        remaining_bytes -= 4096
+        print('Remaining bigdata - %i bytes...)' % (remaining_bytes))
+        while (remaining_bytes > 0):
+            bigdata += tmp
+            if (remaining_bytes < 4096):
+                tmp = self.conn.recv(remaining_bytes)
+                remaining_bytes -= remaining_bytes
+            else:
+                tmp = self.conn.recv(4096)
+                remaining_bytes -= 4096
+            print('Remaining bigdata - %i bytes...)' % (remaining_bytes))
+        print(len(bigdata))
+        lost_bytes = need_to_recieve - len(bigdata)
+        print('Lost %i bytes' % (lost_bytes))
+        self.conn.close()
 
     def generate_length_packet(self, length):
         ''' Generates a packet that indicates the next packet length '''
@@ -84,9 +97,13 @@ class SantriClient:
 
     def int_to_4hex(self, num):
         ''' Convert int to 4 byte hex (just like 1 to 00 00 00 01) '''
-        #!!! Здесь нужно сделать reverse для 4 байтов hex и можно начинать отправлять запросы
-        # Возврат должен быть в виде b'\x00\x00\x00\x00'
-        return numpy.int32(num)
+        #TODO: Отредактировать, должно работать с числами, больше 255
+        if (num>255):
+            raise ValueError('int_to_4hex() not working with numbers which more than 255')
+        data = bytearray()
+        data.extend(numpy.int32(num))
+        data.reverse()
+        return data
 
 class SantriParser:
     ''' Santricity parser of raw data '''
