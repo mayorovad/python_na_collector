@@ -25,6 +25,12 @@ class SantriClient:
         session_sign = b'\x55\x6c\x31\x77'
         return session_sign
 
+    def generate_length_packet(self, length):
+        ''' Generates a packet that indicates the next packet length '''
+        length_pack = bytearray(b'\x80\x00\x00')
+        length_pack.append(length)
+        return length_pack
+
     def generate_packet(self, packet_code):
         ''' Generates the package on the signature of the session
             and the request code
@@ -45,55 +51,46 @@ class SantriClient:
         return packet_data
 
     def show(self, command):
-        ''' Returns the response to a main_package in a readable form '''
+        ''' Gets the server's response to the command '''
         if (command == 'bigdata'):
-            main_package = self.generate_packet('040')
-            self.get_data(main_package)
+            request_packet = self.generate_packet('040')
+            self.get_data(request_packet)
 
-    def get_data(self, main_package):
-        ''' Returns the data which have been received from the server '''
+    def get_data(self, request_package):
+        ''' Returns data from a server in response to a request packet '''
         self.conn = socket.socket()
         self.conn.connect( (self.host, self.port) )
 
         #Делим на 2, так как нужна длина в байтах
-        length_packet = self.generate_length_packet(len(main_package))
-        main_packet = self.generate_packet(main_package)
+        length_packet = self.generate_length_packet(len(request_package))
 
-        print ('Sending length_packet, main packet length is %i' % (len(main_package)))
+        print ('Sending length_packet (request_package length is %i)' % (len(request_package)))
         self.conn.send(length_packet)
-        print ('Sending main package...')
-        self.conn.send(main_package)
+        print ('Sending request_package...')
+        self.conn.send(request_package)
 
         print ('Receiving length_packet from server...')
         length_packet = self.conn.recv(4)
         need_to_recieve = int(binascii.hexlify(length_packet[-2::]), 16)
         remaining_bytes = need_to_recieve
-        print(remaining_bytes)
-        print('Receiving bigdata (%i bytes)' % (need_to_recieve))
+        print('Server will send %i bytes' % (need_to_recieve))
 
         bigdata = b''
-        tmp = self.conn.recv(4096)
-        remaining_bytes -= 4096
-        print('Remaining bigdata - %i bytes...)' % (remaining_bytes))
         while (remaining_bytes > 0):
-            bigdata += tmp
+            print('%i%% ' % ((need_to_recieve - remaining_bytes)*100/need_to_recieve),end="",flush=True)
             if (remaining_bytes < 4096):
                 tmp = self.conn.recv(remaining_bytes)
                 remaining_bytes -= remaining_bytes
+                bigdata += tmp
             else:
                 tmp = self.conn.recv(4096)
                 remaining_bytes -= 4096
-            print('Remaining bigdata - %i bytes...)' % (remaining_bytes))
-        print(len(bigdata))
-        lost_bytes = need_to_recieve - len(bigdata)
-        print('Lost %i bytes' % (lost_bytes))
-        self.conn.close()
+                bigdata += tmp
 
-    def generate_length_packet(self, length):
-        ''' Generates a packet that indicates the next packet length '''
-        length_pack = bytearray(b'\x80\x00\x00')
-        length_pack.append(length)
-        return length_pack
+        lost_bytes = need_to_recieve - len(bigdata)
+        print('done')
+        print('Received %i bytes. %i bytes lost.' %(len(bigdata), lost_bytes))
+        self.conn.close()
 
     def int_to_4hex(self, num):
         ''' Convert int to 4 byte hex (just like 1 to 00 00 00 01) '''
