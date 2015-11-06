@@ -1,40 +1,26 @@
 - [X] Настройка
-  - [x] Lubuntu x64, ~~CentOS 6~~
+  - [x] Lubuntu x64
   - [x] Emulator
-  - [x] client + runtime, _графический клиент SM даже получил состояние Optimal у эмулятора
+  - [x] client + runtime
   - [x] wireshark
-- [ ] Начало
+- [x] Начало
   - [x] Читать Лутца про bytearray
-  - [ ] Использовать (0/1, 0/2) для инициализации
-  - [ ] Получить bigdata от эмулятора (0/2, 0/43, 0/48, 0/40)
-- [ ] [Тут статья про то как писать на perl.] (http://citforum.ru/internet/perl/ten_tips/) И есть упоминание про автофрматирование текста. Возможно будет полезно.
-
-Пример класса коннектор, тут для SMTP, главное чтобы были методы __enter__ __exit__.
-
-
-      class ServerConnect(object):
-
-        """
-            class for with. Create connect to smtp server.
-        """
-        def __init__(self):
-            self.server = None
-            self.smtppasswd = mailconfig.smtppasswd
-            self.smtpservername = mailconfig.smtpservername
-            self.port='465'
-            self.myadress = mailconfig.myaddress
-        def __enter__(self):
-            """ On enter in with """
-            self.server = smtplib.SMTP_SSL(self.smtpservername, self.port)
-            return self.server
-        def __exit__(self, _type, value, traceback):
-            """ On exit of with """
-            self.server.quit()
-      
-        
-      self.server_connect = ServerConnect()
-      with self.server_connect as server:
-        server.sendmail(self._from, self.to, top.as_string())
-  
-    
-  Экономия в пару строк, зато не нужно следить за закрытием соединения)
+  - [x] Получить bigdata от эмулятора
+- Доп. задачи
+  - [ ] Добавить класс-коннектор
+  - [ ] Сделать реализацию int_to_4hex() для чисел больше 255
+  - [ ] Переписать форматы для [unpack для Perl](http://www.tutorialspoint.com/perl/perl_unpack.htm) под функцию
+[struct.unpack для Python](https://docs.python.org/2/library/struct.html#struct.unpack)
+- Парсинг bigdata
+  - [ ] Режим контроллера
+  - [ ] Суммарная мощность
+  - [ ] Потребление от БП (1-2)
+  - [ ] Состояние БП (1-2)
+  - [ ] Состояние батарейки (1-2)
+  - [ ] Состояние SFP (1-8)
+  - [ ] Состояние и объем тома OST0
+  - [ ] Состояние и объем тома BACKUP
+  - [ ] Состояние и объем тома GFS0
+  - [ ] Состояние и объем тома SMC1
+  - [ ] Состояние и объем тома MDT0
+  - [ ] Состояние и объем тома VM_STORAGE
