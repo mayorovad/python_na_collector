@@ -20,6 +20,7 @@ class SantriClient:
     def generate_session_signature():
         ''' Generates a time signature for the current session '''
         #TODO: написать код для генерирования сигнатуры
+        #Пока что сигнатура из рандомной сессии
         session_sign = b'\x55\x6c\x31\x77'
         return session_sign
 
@@ -47,29 +48,31 @@ class SantriClient:
         '''
 
         packet_data = bytearray()
-        if code_b == 0 and code_c == 40:
-            packet_data.extend(self.time_sign)
-            packet_data.extend(self.int_to_4hex(0))
-            packet_data.extend(self.int_to_4hex(2))
-            packet_data.extend(b'\x53\x69\x4d\x42')
-            packet_data.extend(self.int_to_4hex(1))
-            #Следующий extend должен добавлять 00 00 B C
-            #В зависимости от кода пакета
-            packet_data.extend(b'\x00\x00')
-            packet_data.append(code_b)
-            packet_data.append(code_c)
-            packet_data.extend(self.int_to_4hex(40))
-            packet_data.extend(self.int_to_4hex(0))
-            packet_data.extend(self.int_to_4hex(0))
-            packet_data.extend(self.int_to_4hex(0))
-            packet_data.extend(self.int_to_4hex(0))
+
+        packet_data.extend(self.time_sign)
+        packet_data.extend(self.int_to_4hex(0))
+        packet_data.extend(self.int_to_4hex(2))
+        packet_data.extend(b'\x53\x69\x4d\x42')
+        packet_data.extend(self.int_to_4hex(1))
+        #Следующий extend должен добавлять 00 00 B C
+        #В зависимости от кода пакета
+        packet_data.extend(b'\x00\x00')
+        packet_data.append(code_b)
+        packet_data.append(code_c)
+        packet_data.extend(self.int_to_4hex(40))
+        packet_data.extend(self.int_to_4hex(0))
+        packet_data.extend(self.int_to_4hex(0))
+        packet_data.extend(self.int_to_4hex(0))
+        packet_data.extend(self.int_to_4hex(0))
+
         return packet_data
 
     def show(self, command):
         ''' Gets the server's response to the command '''
         if command == 'bigdata':
             request_packet = self.generate_packet_by_code(0, 40)
-            self.get_data(request_packet)
+            bigdata = self.get_data(request_packet)
+        return bigdata
 
     def get_data(self, request_package):
         ''' Returns data from a server in response to a request packet '''
@@ -91,32 +94,44 @@ class SantriClient:
         print('Server will send %i bytes' % (need_to_recieve))
 
         bigdata = b''
+        tmp = conn.recv(1)
+        remaining_bytes -= 1
+        bigdata += tmp
         while remaining_bytes > 0:
             percent = (need_to_recieve - remaining_bytes)*100/need_to_recieve
-            print('%i%% ' % (percent), end="", flush=True)
-            if remaining_bytes < 4096:
+            #print('%i%% ' % (percent), end="", flush=True)
+            if remaining_bytes < 2:
                 tmp = conn.recv(remaining_bytes)
                 remaining_bytes -= remaining_bytes
                 bigdata += tmp
             else:
-                tmp = conn.recv(4096)
-                remaining_bytes -= 4096
+                tmp = conn.recv(2)
+                print(binascii.hexlify(tmp))
+                if binascii.hexlify(tmp)==b'e409':
+                    print('FOUND E409')
+                    break
+                remaining_bytes -= 2
                 bigdata += tmp
 
         lost_bytes = need_to_recieve - len(bigdata)
         print('done')
         print('Received %i bytes. %i bytes lost.' %(len(bigdata), lost_bytes))
         conn.close()
+        return bigdata
 
-# class SantriParser:
-#     ''' Santricity parser of raw data '''
-#
-#     def parse_data(self, data, command):
-#         ''' Receives the data as an array of bytes from the server
-#             and returns the required data in a readable format
-#         '''
-#
+class SantriParser:
+    ''' Santricity parser of raw data '''
+
+    def parse_data(self, data, command):
+        ''' Receives the data as an array of bytes from the server
+            and returns the required data in a readable format
+        '''
+
 
 if __name__ == '__main__':
     MY_SM_CLI = SantriClient('localhost', 2463)
-    MY_SM_CLI.show('bigdata')
+    bigdata = MY_SM_CLI.show('bigdata')
+    #print(binascii.hexlify(bigdata))
+    print('\n main: bigdata output completed')
+    MY_SM_PARSER = SantriParser()
+    MY_SM_PARSER.parse_data(bigdata, 'bigdata')
