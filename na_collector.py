@@ -4,7 +4,6 @@
 from __future__ import print_function
 import socket
 import binascii
-import numpy
 
 class SantriClient:
     ''' Santricity client that sends the packets to the server
@@ -20,7 +19,6 @@ class SantriClient:
     @staticmethod
     def generate_session_signature():
         ''' Generates a time signature for the current session '''
-        #TODO: написать здесь код для генерирования сигнатуры
         #Пока что сигнатура из рандомной сессии
         session_sign = b'\x55\x6c\x31\x77'
         return session_sign
@@ -29,20 +27,21 @@ class SantriClient:
     def generate_length_packet(request_packet):
         ''' Generates a packet that indicates the request_packet length '''
         #80 - стандартное начало байта для пакета длины в SYMBol
-        length_pack = bytearray(b'\x80\x00\x00')
-        length_pack.append(len(request_packet))
+        length_pack = bytearray(b'\x80')
+        length = len(request_packet)
+        #to_bytes() создает массив bytes() размером 3 байта, с порядком big
+        length_pack.extend(length.to_bytes(3, byteorder='big'))
+
         return length_pack
 
     @staticmethod
     def int_to_4hex(num):
-        ''' Convert int to 4 byte hex (just like 1 to 00 00 00 01) '''
-        #TODO: Отредактировать, должно работать с числами, больше 255
-        #И неплохо было бы избавиться от numpy
-        if num > 255:
-            raise ValueError('int_to_4hex() not working with numbers which more than 255')
+        ''' Convert int to 4 hex bytes with big byte order '''
+        #to_bytes() создает массив bytes() размером 4 байта, с порядком big
+        #то есть сначала нулевые байты, а потом байты со значениями
         data = bytearray()
-        data.extend(numpy.int32(num))
-        data.reverse()
+        data = num.to_bytes(4, byteorder='big')
+
         return data
 
     def generate_packet_by_code(self, code_b, code_c):
@@ -50,14 +49,14 @@ class SantriClient:
             and the request code
         '''
         #Восстановление структуры пакета согласно протоколу
+        #(см. /statistics/about_packet_structure.md)
         packet_data = bytearray()
         packet_data.extend(self.time_sign)
         packet_data.extend(self.int_to_4hex(0))
         packet_data.extend(self.int_to_4hex(2))
         packet_data.extend(b'\x53\x69\x4d\x42')
         packet_data.extend(self.int_to_4hex(1))
-        #Следующий extend должен добавлять 00 00 B C
-        #в зависимости от кода пакета
+        #Следующие 3 extend должны добавлять 00 00 B C
         packet_data.extend(b'\x00\x00')
         packet_data.append(code_b)
         packet_data.append(code_c)
@@ -66,37 +65,66 @@ class SantriClient:
         packet_data.extend(self.int_to_4hex(0))
         packet_data.extend(self.int_to_4hex(0))
 
+        #Дополнительные 32 байта для q1, зачем нужны - не знаю
+        if code_b == 0 and code_c == 2:
+            packet_data.extend(b'\x07\x00\x00\x00')
+            packet_data.extend(self.int_to_4hex(0))
+            packet_data.extend(self.int_to_4hex(1))
+            packet_data.extend(self.int_to_4hex(16))
+            packet_data.extend(b'\x60\x0a\x09\x80')
+            packet_data.extend(b'\x00\x5d\xe4\x9d')
+            packet_data.extend(self.int_to_4hex(0))
+            packet_data.extend(b'\x53\xd8\x64\x0f')
+
         return packet_data
 
     def perform(self, command):
         ''' Performs user command. If the command
             is not valid, displays a list of commands.
         '''
+        print('\n***Performing %s command***' % command)
+        #q4_data - основная информация о компонентах и томах
         if command == 'q4_data':
             request_packet = self.generate_packet_by_code(0, 40)
             length_packet = self.generate_length_packet(request_packet)
             bigdata = self.get_data(length_packet, request_packet)
-            self.parser.parse_data(bigdata, 'q4_data')
+            self.parser.parse_data(bigdata, command)
+
+        #q1_data - информация о режиме контроллера
+        if command == 'q1_data':
+            request_packet = self.generate_packet_by_code(0, 2)
+            length_packet = self.generate_length_packet(request_packet)
+            bigdata = self.get_data(length_packet, request_packet)
+            self.parser.parse_data(bigdata, command)
+
+        #qpowerinfo_data - информация о блоках питания
+        if command == 'qpowerinfo_data':
+            request_packet = self.generate_packet_by_code(2, 202)
+            length_packet = self.generate_length_packet(request_packet)
+            bigdata = self.get_data(length_packet, request_packet)
+            self.parser.parse_data(bigdata, command)
+
 
         return bigdata
 
     def get_data(self, length_packet, request_packet):
         ''' Returns data from a server in response to a request packet '''
+        print('Connecting to %s:%i...' % (self.host, self.port), end='')
         conn = socket.socket()
         conn.connect((self.host, self.port))
+        print('done')
 
-        print('Sending length_packet (request_package length is %i)' % (len(request_packet)))
+        print('Sending request to server...', end='')
         conn.send(length_packet)
-        print('Sending request_packet...')
         conn.send(request_packet)
+        print('done')
 
-        print('Receiving length_packet from server...')
+        print('Receiving data from server...', end='')
         length_packet = conn.recv(4)
 
         #Смотрим пакет длины от сервера, оцениваем, сколько байт будем получать
         need_to_recieve = int(binascii.hexlify(length_packet[-2::]), 16)
         remaining_bytes = need_to_recieve
-        print('Server will send %i bytes' % (need_to_recieve))
 
         #Начинаем получать основные данные от сервера
         data = b''
@@ -128,7 +156,8 @@ class SantriParser:
 
         #q4_data - основная информация о компонентах и томах
         if command == 'q4_data':
-            print('SantriParser started with %s command' % (command))
+            print('\n***SantriParser started with %s command***' % (command))
+            self.parse_ps(data)
             self.parse_battery(data)
             self.parse_sfp(data)
             self.parse_ost(data)
@@ -137,72 +166,143 @@ class SantriParser:
             self.parse_smc(data)
             self.parse_mdt(data)
             self.parse_vm_storage(data)
+        #q1_data - информация о режиме контроллера
+        if command == 'q1_data':
+            print('\n***SantriParser started with %s command***' % (command))
+            self.parse_controller_status(data)
+        #qpowerinfo_data - информация о блоках питания
+        if command == 'qpowerinfo_data':
+            print('\n***SantriParser started with %s command***' % (command))
+            self.parse_voltage(data)
+
+    @staticmethod
+    def parse_ps(data):
+        ''' Parsing data for power supply status '''
+        #marker -> battery_num (1 byte) -> 12 null bytes -> sence_byte (sign char)
+        ps_marker = b'\x00\x00\x00\xf4\x0a\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        position = data.find(ps_marker + b'\x01')
+        status = data[position + len(ps_marker) + 1 + 12]
+        print('Power supply 1 status is %i' % status)
+        position = data.find(ps_marker + b'\x02')
+        status = data[position + len(ps_marker) + 1 + 12]
+        print('Power supply 2 status is %i' % status)
 
     @staticmethod
     def parse_battery(data):
         ''' Parsing data for battery status '''
-
+        #marker -> battery_num (1 byte) -> 12 null bytes -> sence_byte (sign char)
         battery_marker = b'\x00\x00\x00\xe4\x09\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-        position = data.find(battery_marker)
-        print('Found BATTERY_MARKER on %i byte' % (position))
+        position = data.find(battery_marker + b'\x01')
+        status = data[position + len(battery_marker) + 1 + 12]
+        print('Battery 1 status is %i' % status)
+        position = data.find(battery_marker + b'\x02')
+        status = data[position + len(battery_marker) + 1 + 12]
+        print('Battery 2 status is %i' % status)
 
     @staticmethod
     def parse_sfp(data):
         ''' Parsing data for SFP status '''
-
+        #marker -> sfp_num (1 byte) -> 12 null bytes -> sence_byte (sign char)
         sfp_marker = b'\x00\x00\x01\x48\x13\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-        position = data.find(sfp_marker)
-        print('Found SFP_MARKER on %i byte' % (position))
+        for num in range(1, 9):
+            position = data.find(sfp_marker + (num).to_bytes(1, byteorder='big'))
+            status = data[position + len(sfp_marker) + 1 + 12]
+            print('SFP%i status is %i' % (num, status))
 
     @staticmethod
     def parse_ost(data):
         ''' Parsing data for OST0 volume status and capacity '''
-
+        #marker -> 71 null bytes -> status_byte (sign char)
+        #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
         ost_marker = b'\x00\x00\x01\x40\x00\x00\x40\x01'
         position = data.find(ost_marker)
-        print('Found OST_MARKER on %i byte' % (position))
+        status = data[position + len(ost_marker) + 71]
+        capacity_position = position + len(ost_marker) + 37
+        capacity = int(binascii.hexlify(data[capacity_position:capacity_position+2]), 16)
+        print('OST0 status is %i, capacity is %i TB' % (status, capacity))
 
     @staticmethod
     def parse_backup(data):
         ''' Parsing data for BACKUP volume status and capacity '''
-
+        #marker -> 75 null bytes -> status_byte (sign char)
+        #marker -> 41 null bytes -> capacity_byte (short_int - 2 bytes)
         backup_marker = b'\x00\x00\x01\x44\x00\x00\x40\x02'
         position = data.find(backup_marker)
-        print('Found BACKUP_MARKER on %i byte' % (position))
+        status = data[position + len(backup_marker) + 75]
+        capacity_position = position + len(backup_marker) + 41
+        capacity = int(binascii.hexlify(data[capacity_position:capacity_position+2]), 16)
+        print('BACKUP status is %i, capacity is %i TB' % (status, capacity))
 
     @staticmethod
     def parse_gfs(data):
         ''' Parsing data for GFS0 volume status and capacity '''
-
+        #marker -> 71 null bytes -> status_byte (sign char)
+        #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
         gfs_marker = b'\x00\x00\x01\x40\x00\x00\x40\x03'
         position = data.find(gfs_marker)
-        print('Found GFS_MARKER on %i byte' % (position))
+        status = data[position + len(gfs_marker) + 71]
+        capacity_position = position + len(gfs_marker) + 37
+        capacity = int(binascii.hexlify(data[capacity_position:capacity_position+2]), 16)
+        print('GFS0 status is %i, capacity is %i TB' % (status, capacity))
 
     @staticmethod
     def parse_smc(data):
-        ''' Parsing data for SMCS1 volume status and capacity '''
-
+        ''' Parsing data for SMC1 volume status and capacity '''
+        #marker -> 71 null bytes -> status_byte (sign char)
+        #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
         smc_marker = b'\x00\x00\x01\x40\x00\x00\x40\x04'
         position = data.find(smc_marker)
-        print('Found SMC_MARKER on %i byte' % (position))
+        status = data[position + len(smc_marker) + 71]
+        capacity_position = position + len(smc_marker) + 37
+        capacity = int(binascii.hexlify(data[capacity_position:capacity_position+2]), 16)
+        print('SMC1 status is %i, capacity is %i TB' % (status, capacity))
 
     @staticmethod
     def parse_mdt(data):
         ''' Parsing data for MDT0 volume status and capacity '''
-
+        #marker -> 71 null bytes -> status_byte (sign char)
+        #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
         mdt_marker = b'\x00\x00\x01\x40\x00\x00\x40\x05'
         position = data.find(mdt_marker)
-        print('Found MDT_MARKER on %i byte' % (position))
+        status = data[position + len(mdt_marker) + 71]
+        capacity_position = position + len(mdt_marker) + 37
+        capacity = int(binascii.hexlify(data[capacity_position:capacity_position+2]), 16)
+        print('MDT0 status is %i, capacity is %i TB' % (status, capacity))
 
     @staticmethod
     def parse_vm_storage(data):
         ''' Parsing data for VM_STORAGE volume status and capacity '''
-
+        #marker -> 83 null bytes -> status_byte (sign char)
+        #marker -> 49 null bytes -> capacity_byte (short_int - 2 bytes)
         vm_storage_marker = b'\x00\x00\x01\x4c\x00\x00\x40\x06'
         position = data.find(vm_storage_marker)
-        print('Found VM_STORAGE_MARKER on %i byte' % (position))
+        status = data[position + len(vm_storage_marker) + 83]
+        capacity_position = position + len(vm_storage_marker) + 49
+        capacity = int(binascii.hexlify(data[capacity_position:capacity_position+2]), 16)
+        print('VM_STORAGE status is %i, capacity is %i TB' % (status, capacity))
 
+    @staticmethod
+    def parse_controller_status(data):
+        ''' Parsing data for controller status '''
+        #27 null bytes -> status_byte (sign char)
+        status = data[27]
+        print('Controller status is %i' % status)
 
+    @staticmethod
+    def parse_voltage(data):
+        ''' Parsing data for voltage of each controller '''
+        #-> 36 null bytes -> summary_voltage (long_int - 4 bytes?)
+        #-> 64 null bytes -> voltage1 (long_int - 4 bytes?)
+        #-> 68 null bytes -> voltage2 (long_int - 4 bytes?)
+        summary_voltage = int(binascii.hexlify(data[36:36+4]), 16)
+        voltage1 = int(binascii.hexlify(data[64:64+4]), 16)
+        voltage2 = int(binascii.hexlify(data[68:68+4]), 16)
+        print('Power supply summary voltage is %i W' % summary_voltage)
+        print('Power supply 1 voltage is %i W' % voltage1)
+        print('Power supply 2 voltage is %i W' % voltage2)
 if __name__ == '__main__':
+    #XXX: эмулятор перестает отвечать после нескольких запросов
     MY_SM_CLI = SantriClient('localhost', 2463)
     MY_SM_CLI.perform('q4_data')
+    MY_SM_CLI.perform('q1_data')
+    MY_SM_CLI.perform('qpowerinfo_data')

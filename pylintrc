@@ -21,14 +21,6 @@ persistent=yes
 # usually to register additional checkers.
 load-plugins=
 
-# Deprecated. It was used to include message's id in output. Use --msg-template
-# instead.
-include-ids=no
-
-# Deprecated. It was used to include symbolic ids of messages in output. Use
-# --msg-template instead.
-symbols=no
-
 # Use multiple processes to speed up Pylint.
 jobs=1
 
@@ -277,7 +269,7 @@ ignore-mixin-members=yes
 # List of module names for which member attributes should not be checked
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis
-ignored-modules = numpy
+ignored-modules =
 
 # List of classes names for which member attributes should not be checked
 # (useful for classes with attributes dynamically set).
