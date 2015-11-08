@@ -190,7 +190,7 @@ class SantriParser:
         if status == 1:
             self.collector_report['PS1 STATUS'] = 'OK'
         else:
-            if status in range(2, 4):
+            if status in range(2, 5):
                 self.collector_report['PS1 STATUS'] = 'Failure'
             else:
                 if status == 5:
