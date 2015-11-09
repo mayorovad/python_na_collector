@@ -204,7 +204,7 @@ class SantriParser:
         if status == 1:
             self.collector_report['PS2 STATUS'] = 'OK'
         else:
-            if status in range(2, 4):
+            if status in range(2, 5):
                 self.collector_report['PS2 STATUS'] = 'Failure'
             else:
                 if status == 5:
@@ -219,13 +219,13 @@ class SantriParser:
         battery_marker = b'\x00\x00\x00\xe4\x09\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         position = data.find(battery_marker + b'\x01')
         status = data[position + len(battery_marker) + 1 + 12]
-        if status in range(1, 2):
+        if status in range(1, 3):
             self.collector_report['BATTERY1 STATUS'] = 'OK'
         else:
             if status == 3:
                 self.collector_report['BATTERY1 STATUS'] = 'Expiring'
             else:
-                if status in range(4, 5):
+                if status in range(4, 6):
                     self.collector_report['BATTERY1 STATUS'] = 'Failure'
                 else:
                     if status == 13:
@@ -236,13 +236,13 @@ class SantriParser:
         print('Battery 1 status is %i' % status)
         position = data.find(battery_marker + b'\x02')
         status = data[position + len(battery_marker) + 1 + 12]
-        if status in range(1, 2):
+        if status in range(1, 3):
             self.collector_report['BATTERY2 STATUS'] = 'OK'
         else:
             if status == 3:
                 self.collector_report['BATTERY2 STATUS'] = 'Expiring'
             else:
-                if status in range(4, 5):
+                if status in range(4, 6):
                     self.collector_report['BATTERY2 STATUS'] = 'Failure'
                 else:
                     if status == 13:
