@@ -1,5 +1,4 @@
 ''' Santricity diagnostic info collector '''
-#Чтобы избавиться от бага pylint с поиском numpy
 
 from __future__ import print_function
 import socket
@@ -122,14 +121,13 @@ class SantriClient:
         length_packet = conn.recv(4)
 
         #Смотрим пакет длины от сервера, оцениваем, сколько байт будем получать
-        need_to_recieve = int(binascii.hexlify(length_packet[-2::]), 16)
+        need_to_recieve = int(binascii.hexlify(length_packet[-3::]), 16)
         remaining_bytes = need_to_recieve
 
-        #Начинаем получать основные данные от сервера
+        #Начинаем получать данные от сервера
         data = b''
         data_part_size = 4096 #Пакеты какого размера будем получать
         while remaining_bytes > 0:
-            #percent = (need_to_recieve - remaining_bytes)*100/need_to_recieve
             if remaining_bytes < data_part_size-1:
                 tmp = conn.recv(remaining_bytes)
                 remaining_bytes -= remaining_bytes
@@ -359,19 +357,19 @@ class SantriParser:
         print('Controller status is %i' % status)
 
     def parse_voltage(self, data):
-        ''' Parsing data for voltage of each controller '''
+        ''' Parsing data for power of each controller '''
         #-> 36 null bytes -> summary_voltage (long_int - 4 bytes?)
         #-> 64 null bytes -> voltage1 (long_int - 4 bytes?)
         #-> 68 null bytes -> voltage2 (long_int - 4 bytes?)
         summary_voltage = int(binascii.hexlify(data[36:36+4]), 16)
         voltage1 = int(binascii.hexlify(data[64:64+4]), 16)
         voltage2 = int(binascii.hexlify(data[68:68+4]), 16)
-        self.collector_report['SUMMARY VOLTAGE'] = '%i W' % summary_voltage
-        self.collector_report['PS1 VOLTAGE'] = '%i W' % voltage1
-        self.collector_report['PS2 VOLTAGE'] = '%i W' % voltage2
-        print('Power supply summary voltage is %i W' % summary_voltage)
-        print('Power supply 1 voltage is %i W' % voltage1)
-        print('Power supply 2 voltage is %i W' % voltage2)
+        self.collector_report['SUMMARY WATT'] = '%i W' % summary_voltage
+        self.collector_report['PS1 WATT'] = '%i W' % voltage1
+        self.collector_report['PS2 WATT'] = '%i W' % voltage2
+        print('Power supply summary power is %i W' % summary_voltage)
+        print('Power supply 1 power is %i W' % voltage1)
+        print('Power supply 2 power is %i W' % voltage2)
 
     def parse_volume_status(self, status, volume_name):
         ''' Parsing status of standart volumes '''
@@ -381,7 +379,6 @@ class SantriParser:
             self.collector_report['%s STATUS' % volume_name] = 'Unknown'
 
 if __name__ == '__main__':
-    #XXX: эмулятор перестает отвечать после нескольких запросов
     MY_SM_CLI = SantriClient('localhost', 2463)
     MY_SM_CLI.perform('q4_data')
     MY_SM_CLI.perform('q1_data')

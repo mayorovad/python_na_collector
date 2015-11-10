@@ -12,3 +12,6 @@
 | SMC1 | OK | Используется с tape and medium changer devices. Единственное упоминание нашел [здесь](https://books.google.ru/books?id=CbLEAgAAQBAJ&pg=PA303&dq=SMC1+ibm&hl=ru&sa=X&ved=0CCMQ6AEwAGoVChMI776Wu8mFyQIVQlgsCh09IAGW#v=onepage&q=SMC1%20ibm&f=false)
 | MDT0 | OK | Metadata target - хранит метаданные о пространстве имен, например имена файлов, каталогов, права доступа, а также карту размещения файлов |
 | VM_STORAGE | OK | Том для интеграции с VMware? |
+| CONTROLLER STATUS | Main / Reserve | Режим работы контроллера (основной или резервный) |
+| SUMMARY WATT | ... W | Суммарная мощность, Вт |
+| PS[N] WATT | ... W | Мощность блока питания N, Вт |
