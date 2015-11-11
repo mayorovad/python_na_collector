@@ -4,6 +4,7 @@ from __future__ import print_function
 import socket
 import binascii
 
+
 class SantriClient:
     ''' Santricity client that sends the packets to the server
         and transmits the response from the server to parser
@@ -11,6 +12,7 @@ class SantriClient:
 
     def __init__(self, host, port):
         self.time_sign = self.generate_session_signature()
+        #TODO host, port пусть берет из конфига 
         self.host = host
         self.port = port
         self.parser = SantriParser()
@@ -19,18 +21,20 @@ class SantriClient:
     def generate_session_signature():
         ''' Generates a time signature for the current session '''
         #Пока что сигнатура из рандомной сессии
+        #TODO Xорошо бы иметь config.py в котором
+        #     будум храниться различные константы.
         session_sign = b'\x55\x6c\x31\x77'
         return session_sign
 
     @staticmethod
     def generate_length_packet(request_packet):
         ''' Generates a packet that indicates the request_packet length '''
+        #TODO тоже в конфиг
         #80 - стандартное начало байта для пакета длины в SYMBol
         length_pack = bytearray(b'\x80')
         length = len(request_packet)
         #to_bytes() создает массив bytes() размером 3 байта, с порядком big
         length_pack.extend(length.to_bytes(3, byteorder='big'))
-
         return length_pack
 
     @staticmethod
@@ -40,7 +44,6 @@ class SantriClient:
         #то есть сначала нулевые байты, а потом байты со значениями
         data = bytearray()
         data = num.to_bytes(4, byteorder='big')
-
         return data
 
     def generate_packet_by_code(self, code_b, code_c):
@@ -48,6 +51,8 @@ class SantriClient:
             and the request code
         '''
         #Восстановление структуры пакета согласно протоколу
+        #TODO about_packet_structure.md уже в другом месте))
+        #TODO все константы в конфиг, и осмысленные имена для них
         #(см. /statistics/about_packet_structure.md)
         packet_data = bytearray()
         packet_data.extend(self.time_sign)
@@ -63,7 +68,6 @@ class SantriClient:
         packet_data.extend(self.int_to_4hex(0))
         packet_data.extend(self.int_to_4hex(0))
         packet_data.extend(self.int_to_4hex(0))
-
         #Дополнительные 32 байта для q1, зачем нужны - не знаю
         if code_b == 0 and code_c == 2:
             packet_data.extend(b'\x07\x00\x00\x00')
@@ -74,13 +78,15 @@ class SantriClient:
             packet_data.extend(b'\x00\x5d\xe4\x9d')
             packet_data.extend(self.int_to_4hex(0))
             packet_data.extend(b'\x53\xd8\x64\x0f')
-
         return packet_data
 
     def perform(self, command):
         ''' Performs user command. If the command
             is not valid, displays a list of commands.
         '''
+        #TODO И где возврат списка команд если не валидная команда на входе.
+        #     bigdata = None или что-нибудь похожее, а то, если не угадать,
+        #     с командой скажет, что переменная не объявлена.
         print('\n***Performing %s command***' % command)
         #q4_data - основная информация о компонентах и томах
         if command == 'q4_data':
@@ -112,6 +118,8 @@ class SantriClient:
         conn.connect((self.host, self.port))
         print('done')
 
+        #TODO Давай сделаем отдельную функцию, которая будет отправлять запрос
+        #     на сервер и возвращать need_to_recieve
         print('Sending request to server...', end='')
         conn.send(length_packet)
         conn.send(request_packet)
@@ -126,6 +134,7 @@ class SantriClient:
 
         #Начинаем получать данные от сервера
         data = b''
+        #TODO константы в конфиг
         data_part_size = 4096 #Пакеты какого размера будем получать
         while remaining_bytes > 0:
             if remaining_bytes < data_part_size-1:
@@ -157,7 +166,7 @@ class SantriParser:
         ''' Receives the data as bytes from the server
             and returns the required information in a readable format
         '''
-
+        #TODO Добавь сообщение если не угадал с командой.
         #q4_data - основная информация о компонентах и томах
         if command == 'q4_data':
             print('\n***SantriParser started with %s command***' % (command))
@@ -182,6 +191,7 @@ class SantriParser:
     def parse_ps(self, data):
         ''' Parsing data for power supply status '''
         #marker -> battery_num (1 byte) -> 12 null bytes -> sence_byte (sign char)
+        #TODO Маркеры в конфиг.
         ps_marker = b'\x00\x00\x00\xf4\x0a\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         position = data.find(ps_marker + b'\x01')
         status = data[position + len(ps_marker) + 1 + 12]
@@ -214,6 +224,7 @@ class SantriParser:
     def parse_battery(self, data):
         ''' Parsing data for battery status '''
         #marker -> battery_num (1 byte) -> 12 null bytes -> sence_byte (sign char)
+        #TODO Маркеры в конфиг.
         battery_marker = b'\x00\x00\x00\xe4\x09\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         position = data.find(battery_marker + b'\x01')
         status = data[position + len(battery_marker) + 1 + 12]
@@ -252,6 +263,7 @@ class SantriParser:
     def parse_sfp(self, data):
         ''' Parsing data for SFP status '''
         #marker -> sfp_num (1 byte) -> 12 null bytes -> sence_byte (sign char)
+        #TODO Маркеры в конфиг.
         sfp_marker = b'\x00\x00\x01\x48\x13\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         for num in range(1, 9):
             position = data.find(sfp_marker + (num).to_bytes(1, byteorder='big'))
@@ -269,6 +281,7 @@ class SantriParser:
         ''' Parsing data for OST0 volume status and capacity '''
         #marker -> 71 null bytes -> status_byte (sign char)
         #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
+        #TODO Маркеры в конфиг.
         ost_marker = b'\x00\x00\x01\x40\x00\x00\x40\x01'
         position = data.find(ost_marker)
         status = data[position + len(ost_marker) + 71]
@@ -282,6 +295,7 @@ class SantriParser:
         ''' Parsing data for BACKUP volume status and capacity '''
         #marker -> 75 null bytes -> status_byte (sign char)
         #marker -> 41 null bytes -> capacity_byte (short_int - 2 bytes)
+        #TODO Маркеры в конфиг.
         backup_marker = b'\x00\x00\x01\x44\x00\x00\x40\x02'
         position = data.find(backup_marker)
         status = data[position + len(backup_marker) + 75]
@@ -295,6 +309,7 @@ class SantriParser:
         ''' Parsing data for GFS0 volume status and capacity '''
         #marker -> 71 null bytes -> status_byte (sign char)
         #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
+        #TODO Маркеры в конфиг.
         gfs_marker = b'\x00\x00\x01\x40\x00\x00\x40\x03'
         position = data.find(gfs_marker)
         status = data[position + len(gfs_marker) + 71]
@@ -308,6 +323,7 @@ class SantriParser:
         ''' Parsing data for SMC1 volume status and capacity '''
         #marker -> 71 null bytes -> status_byte (sign char)
         #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
+        #TODO Маркеры в конфиг.
         smc_marker = b'\x00\x00\x01\x40\x00\x00\x40\x04'
         position = data.find(smc_marker)
         status = data[position + len(smc_marker) + 71]
@@ -321,6 +337,7 @@ class SantriParser:
         ''' Parsing data for MDT0 volume status and capacity '''
         #marker -> 71 null bytes -> status_byte (sign char)
         #marker -> 37 null bytes -> capacity_byte (short_int - 2 bytes)
+        #TODO Маркеры в конфиг.
         mdt_marker = b'\x00\x00\x01\x40\x00\x00\x40\x05'
         position = data.find(mdt_marker)
         status = data[position + len(mdt_marker) + 71]
@@ -334,6 +351,7 @@ class SantriParser:
         ''' Parsing data for VM_STORAGE volume status and capacity '''
         #marker -> 83 null bytes -> status_byte (sign char)
         #marker -> 49 null bytes -> capacity_byte (short_int - 2 bytes)
+        #TODO Маркеры в конфиг.
         vm_storage_marker = b'\x00\x00\x01\x4c\x00\x00\x40\x06'
         position = data.find(vm_storage_marker)
         status = data[position + len(vm_storage_marker) + 83]
@@ -379,6 +397,8 @@ class SantriParser:
             self.collector_report['%s STATUS' % volume_name] = 'Unknown'
 
 if __name__ == '__main__':
+    #TODO Заглавные для констант,
+    #     объекты классов давай обозначать обычными строчными.
     MY_SM_CLI = SantriClient('localhost', 2463)
     MY_SM_CLI.perform('q4_data')
     MY_SM_CLI.perform('q1_data')

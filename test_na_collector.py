@@ -1,7 +1,9 @@
-import na_collector
 import binascii
 import unittest
 import random
+
+import na_collector
+
 
 class TestNaCollector(unittest.TestCase):
     def setUp(self):
