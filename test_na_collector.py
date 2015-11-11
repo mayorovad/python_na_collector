@@ -1,3 +1,4 @@
+''' Тесты для na_collector '''
 import binascii
 import unittest
 import random
@@ -6,8 +7,9 @@ import na_collector
 
 
 class TestNaCollector(unittest.TestCase):
+    ''' unittest.TestCase class for na_collector '''
     def setUp(self):
-        self.sntcli = na_collector.SantriClient('localhost', 2463)
+        self.sntcli = na_collector.SantriClient()
 
     def test_length_packet_size(self):
         ''' Тестирование размера сгенерированного пакета длины '''
@@ -46,47 +48,39 @@ class TestNaCollector(unittest.TestCase):
         for i in range(0, 255):
             for j in range(0, 255):
                 packet = self.sntcli.generate_packet_by_code(i, j)
-                b = int(binascii.hexlify(packet[22:23]), 16)
-                c = int(binascii.hexlify(packet[23:24]), 16)
-                self.assertEqual(b, i)
-                self.assertEqual(c, j)
-
-    def test_perform(self):
-        ''' Тестирование обработки команд клиентом '''
-        data = self.sntcli.perform('q4_data')
-        self.assertEqual(len(data), 58576)
-        data = self.sntcli.perform('q1_data')
-        self.assertEqual(len(data), 28)
-        data = self.sntcli.perform('qpowerinfo_data')
-        self.assertEqual(len(data), 72)
+                code_b = int(binascii.hexlify(packet[22:23]), 16)
+                code_c = int(binascii.hexlify(packet[23:24]), 16)
+                self.assertEqual(code_b, i)
+                self.assertEqual(code_c, j)
 
     def test_parse_ps(self):
         ''' Тестирование определения статуса блоков питания '''
         ps_marker = b'\x00\x00\x00\xf4\x0a\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-
-        for num in range(1,3):
+        num = 0
+        for num in range(1, 3):
             packet = bytearray()
-            packet.extend((random.randint(1,10)).to_bytes(random.randint(1,255), byteorder='big'))
+            packet.extend((random.randint(1, 10)).to_bytes(random.randint(1, 255), byteorder='big'))
             packet.extend(ps_marker)
             packet.extend((num).to_bytes(1, byteorder='big'))
             packet.extend((0).to_bytes(12, byteorder='big'))
             for code in range(0, 7):
                 packet.extend((code).to_bytes(1, byteorder='big'))
                 self.sntcli.parser.parse_ps(packet)
+                report = self.sntcli.parser.collector_report['PS%i STATUS' % num]
                 if code == 0:
-                    self.assertEqual(self.sntcli.parser.collector_report['PS%i STATUS' % num], 'Unknown')
+                    self.assertEqual(report, 'Unknown')
                 if code == 1:
-                    self.assertEqual(self.sntcli.parser.collector_report['PS%i STATUS' % num], 'OK')
+                    self.assertEqual(report, 'OK')
                 if code == 2:
-                    self.assertEqual(self.sntcli.parser.collector_report['PS%i STATUS' % num], 'Failure')
+                    self.assertEqual(report, 'Failure')
                 if code == 3:
-                    self.assertEqual(self.sntcli.parser.collector_report['PS%i STATUS' % num], 'Failure')
+                    self.assertEqual(report, 'Failure')
                 if code == 4:
-                    self.assertEqual(self.sntcli.parser.collector_report['PS%i STATUS' % num], 'Failure')
+                    self.assertEqual(report, 'Failure')
                 if code == 5:
-                    self.assertEqual(self.sntcli.parser.collector_report['PS%i STATUS' % num], 'No power')
+                    self.assertEqual(report, 'No power')
                 if code == 6:
-                    self.assertEqual(self.sntcli.parser.collector_report['PS%i STATUS' % num], 'Unknown')
+                    self.assertEqual(report, 'Unknown')
 
                 packet.pop()
 
@@ -95,34 +89,35 @@ class TestNaCollector(unittest.TestCase):
     def test_parse_battery(self):
         ''' Тестирование определения статуса батарей '''
         battery_marker = b'\x00\x00\x00\xe4\x09\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-
-        for num in range(1,3):
+        num = 0
+        for num in range(1, 3):
             packet = bytearray()
-            packet.extend((random.randint(1,10)).to_bytes(random.randint(1,255), byteorder='big'))
+            packet.extend((random.randint(1, 10)).to_bytes(random.randint(1, 255), byteorder='big'))
             packet.extend(battery_marker)
             packet.extend((num).to_bytes(1, byteorder='big'))
             packet.extend((0).to_bytes(12, byteorder='big'))
             for code in range(0, 15):
                 packet.extend((code).to_bytes(1, byteorder='big'))
                 self.sntcli.parser.parse_battery(packet)
+                report = self.sntcli.parser.collector_report['BATTERY%i STATUS' % num]
                 if code == 0:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'Unknown')
+                    self.assertEqual(report, 'Unknown')
                 if code == 1:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'OK')
+                    self.assertEqual(report, 'OK')
                 if code == 2:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'OK')
+                    self.assertEqual(report, 'OK')
                 if code == 3:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'Expiring')
+                    self.assertEqual(report, 'Expiring')
                 if code == 4:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'Failure')
+                    self.assertEqual(report, 'Failure')
                 if code == 5:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'Failure')
+                    self.assertEqual(report, 'Failure')
                 if code == 12:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'Unknown')
+                    self.assertEqual(report, 'Unknown')
                 if code == 13:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'Charging')
+                    self.assertEqual(report, 'Charging')
                 if code == 14:
-                    self.assertEqual(self.sntcli.parser.collector_report['BATTERY%i STATUS' % num], 'Unknown')
+                    self.assertEqual(report, 'Unknown')
 
                 packet.pop()
 
@@ -131,24 +126,25 @@ class TestNaCollector(unittest.TestCase):
     def test_parse_sfp(self):
         ''' Тестирование определения статуса SFP '''
         sfp_marker = b'\x00\x00\x01\x48\x13\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-
-        for num in range(1,9):
+        num = 0
+        for num in range(1, 9):
             packet = bytearray()
-            packet.extend((random.randint(1,10)).to_bytes(random.randint(1,255), byteorder='big'))
+            packet.extend((random.randint(1, 10)).to_bytes(random.randint(1, 255), byteorder='big'))
             packet.extend(sfp_marker)
             packet.extend((num).to_bytes(1, byteorder='big'))
             packet.extend((0).to_bytes(12, byteorder='big'))
             for code in range(0, 10):
                 packet.extend((code).to_bytes(1, byteorder='big'))
                 self.sntcli.parser.parse_sfp(packet)
+                report = self.sntcli.parser.collector_report['SFP%i STATUS' % num]
                 if code == 0:
-                    self.assertEqual(self.sntcli.parser.collector_report['SFP%i STATUS' % num], 'Unknown')
+                    self.assertEqual(report, 'Unknown')
                 if code == 1:
-                    self.assertEqual(self.sntcli.parser.collector_report['SFP%i STATUS' % num], 'OK')
+                    self.assertEqual(report, 'OK')
                 if code == 2:
-                    self.assertEqual(self.sntcli.parser.collector_report['SFP%i STATUS' % num], 'Failure')
+                    self.assertEqual(report, 'Failure')
                 if code == 3:
-                    self.assertEqual(self.sntcli.parser.collector_report['SFP%i STATUS' % num], 'Unknown')
+                    self.assertEqual(report, 'Unknown')
 
                 packet.pop()
 
@@ -161,30 +157,32 @@ class TestNaCollector(unittest.TestCase):
         for code in range(0, 3):
             packet.extend((code).to_bytes(1, byteorder='big'))
             self.sntcli.parser.parse_controller(packet)
+            report = self.sntcli.parser.collector_report['CONTROLLER STATUS']
             if code == 0:
-                self.assertEqual(self.sntcli.parser.collector_report['CONTROLLER STATUS'], 'Unknown')
+                self.assertEqual(report, 'Unknown')
             if code == 1:
-                self.assertEqual(self.sntcli.parser.collector_report['CONTROLLER STATUS'], 'Main')
+                self.assertEqual(report, 'Main')
             if code == 2:
-                self.assertEqual(self.sntcli.parser.collector_report['CONTROLLER STATUS'], 'Unknown')
+                self.assertEqual(report, 'Unknown')
 
             packet.pop()
 
         for code in range(31, 34):
             packet.extend((code).to_bytes(1, byteorder='big'))
             self.sntcli.parser.parse_controller(packet)
+            report = self.sntcli.parser.collector_report['CONTROLLER STATUS']
             if code == 31:
-                self.assertEqual(self.sntcli.parser.collector_report['CONTROLLER STATUS'], 'Unknown')
+                self.assertEqual(report, 'Unknown')
             if code == 32:
-                self.assertEqual(self.sntcli.parser.collector_report['CONTROLLER STATUS'], 'Reserve')
+                self.assertEqual(report, 'Reserve')
             if code == 33:
-                self.assertEqual(self.sntcli.parser.collector_report['CONTROLLER STATUS'], 'Unknown')
+                self.assertEqual(report, 'Unknown')
 
             packet.pop()
 
         self.sntcli.parser.collector_report.pop('CONTROLLER STATUS')
 
 if __name__ == '__main__':
-	unittest.main()
+    unittest.main()
     #TODO: Тестирование определения статуса стандартных томов
     #TODO: Тестирование определения объема стандартных томов
